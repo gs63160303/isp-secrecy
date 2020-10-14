@@ -28,7 +28,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>isp.secrecy.AgentCommunication</mainClass>
+                            <mainClass>isp.secrecy.A4ExhaustiveSearch</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

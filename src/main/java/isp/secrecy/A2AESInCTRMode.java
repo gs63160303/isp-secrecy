@@ -3,7 +3,9 @@ package isp.secrecy;
 import fri.isp.Agent;
 import fri.isp.Environment;
 
+import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
+import javax.crypto.spec.IvParameterSpec;
 import java.security.Key;
 
 /**
@@ -22,6 +24,8 @@ public class A2AESInCTRMode {
         // STEP 2: Setup communication
         final Environment env = new Environment();
 
+        final int numberOfRepetitions = 10;
+
         env.add(new Agent("alice") {
             @Override
             public void task() throws Exception {
@@ -34,6 +38,36 @@ public class A2AESInCTRMode {
                  * send the IV. The IV can be accessed via the
                  * cipher.getIV() call
                  */
+
+                for (int i = 1; i <= numberOfRepetitions; i++) {
+                    // Serialize the message
+                    final byte[] plaintext = message.getBytes();
+
+                    // Get the cipher instance and initialize it with the key.
+                    final Cipher encrypt = Cipher.getInstance("AES/CTR/PKCS5PADDING");
+                    encrypt.init(Cipher.ENCRYPT_MODE, key);
+
+                    // Encrypt the message
+                    final byte[] ciphertext = encrypt.doFinal(plaintext);
+
+                    // Get initialization vector used in encryption process.
+                    final byte[] initializationVector = encrypt.getIV();
+
+                    // Send the ciphertext and the initialisation vector
+                    send("bob", initializationVector);
+                    send("bob", ciphertext);
+
+                    // Wait for Bob's response
+                    final byte[] bobsIV = receive("bob");
+                    final byte[] encryptedResponse = receive("bob");
+
+                    final Cipher decrypt = Cipher.getInstance("AES/CTR/PKCS5PADDING");
+                    decrypt.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(bobsIV));
+
+                    final byte[] decryptedResponse = decrypt.doFinal(encryptedResponse);
+
+                    print("[%d/%d]  Bob's response: '%s'", i, numberOfRepetitions, new String(decryptedResponse));
+                }
             }
         });
 
@@ -50,6 +84,34 @@ public class A2AESInCTRMode {
                  *
                  * You then pass this object to the cipher init() method call.*
                  */
+
+                final String response = "I love you too, Alice. Kisses. Bob";
+
+                for (int i = 1; i <= numberOfRepetitions; i++) {
+                    // Receive initialization vector
+                    final byte[] initializationVector = receive("alice");
+
+                    // Receive ciphertext vector
+                    final byte[] ciphertext = receive("alice");
+
+                    // Get the cipher instance and initialize it with the key and initialization vector.
+                    final Cipher decrypt = Cipher.getInstance("AES/CTR/PKCS5PADDING");
+                    decrypt.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(initializationVector));
+
+                    final byte[] decryptedPlaintext = decrypt.doFinal(ciphertext);
+
+                    print("[%d/%d] Alice's message: '%s'", i, numberOfRepetitions, new String(decryptedPlaintext));
+
+                    // Respond to Alice
+                    final Cipher encrypt = Cipher.getInstance("AES/CTR/PKCS5PADDING");
+                    encrypt.init(Cipher.ENCRYPT_MODE, key);
+
+                    final byte[] encryptedResponse = encrypt.doFinal(response.getBytes());
+                    final byte[] iv = encrypt.getIV();
+
+                    send("alice", iv);
+                    send("alice", encryptedResponse);
+                }
             }
         });
 
